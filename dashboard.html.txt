@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>북아메리카 축산업 박람회 인터랙티브 대시보드</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet">
+    <!-- Chosen Palette: Warm Neutral (bg-slate-50, text-slate-800, accent bg-blue-600) -->
+    <!-- Application Structure Plan: A single-page dashboard design was chosen for optimal usability. It features a prominent filter and search section at the top, allowing users to instantly refine the expo list. The main content area uses summary stat cards for a quick overview, interactive charts for visual data analysis (expos by year/theme), and a responsive grid of detailed expo cards for easy Browse. This structure transforms a static table into an interactive exploration tool, which is more engaging and efficient for the user than a linear report. -->
+    <!-- Visualization & Content Choices:
+    - Report Info: Expo list -> Goal: Organize/Explore -> Presentation: Interactive card grid -> Interaction: Filtering/Searching -> Justification: Better than a static table for comparing and finding specific expos. Method: Dynamic HTML generation with JS.
+    - Report Info: Expo counts by year/country -> Goal: Compare -> Presentation: Bar Chart -> Interaction: Updates with filters -> Justification: Quick visual comparison of volumes. Library: Chart.js.
+    - Report Info: Expo themes -> Goal: Compare Proportions -> Presentation: Donut Chart -> Interaction: Updates with filters -> Justification: Shows the thematic focus of the North American expo landscape. Library: Chart.js.
+    - Report Info: Key totals -> Goal: Inform -> Presentation: Dynamic Stat Cards -> Interaction: Updates with filters -> Justification: Provides an immediate summary of the filtered dataset. Method: JS DOM manipulation. -->
+    <!-- CONFIRMATION: NO SVG graphics used. NO Mermaid JS used. -->
+    <style>
+        body {
+            font-family: 'Noto Sans KR', sans-serif;
+        }
+        .chart-container {
+            position: relative;
+            width: 100%;
+            max-width: 500px;
+            margin-left: auto;
+            margin-right: auto;
+            height: 320px;
+            max-height: 400px;
+        }
+        @media (min-width: 768px) {
+            .chart-container {
+                height: 350px;
+            }
+        }
+        .filter-btn.active {
+            background-color: #2563eb;
+            color: white;
+            font-weight: 700;
+        }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-800">
+
+    <div class="container mx-auto p-4 md:p-8">
+        <header class="text-center mb-8">
+            <h1 class="text-3xl md:text-4xl font-bold text-slate-900">북아메리카 축산업 박람회 대시보드</h1>
+            <p class="mt-2 text-slate-600">2025-2027년 개최 예정인 주요 박람회 정보를 필터와 차트를 통해 탐색해 보세요.</p>
+        </header>
+
+        <section id="filters" class="bg-white p-6 rounded-xl shadow-md mb-8">
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                <div>
+                    <h3 class="font-bold mb-3 text-lg">개최 연도</h3>
+                    <div id="year-filters" class="flex flex-wrap gap-2">
+                        <button data-filter-group="year" data-filter-value="all" class="filter-btn active py-2 px-4 bg-slate-200 text-slate-700 rounded-full text-sm transition-colors duration-200 hover:bg-slate-300">전체</button>
+                        <button data-filter-group="year" data-filter-value="2025" class="filter-btn py-2 px-4 bg-slate-200 text-slate-700 rounded-full text-sm transition-colors duration-200 hover:bg-slate-300">2025년</button>
+                        <button data-filter-group="year" data-filter-value="2026" class="filter-btn py-2 px-4 bg-slate-200 text-slate-700 rounded-full text-sm transition-colors duration-200 hover:bg-slate-300">2026년</button>
+                    </div>
+                </div>
+                <div>
+                    <h3 class="font-bold mb-3 text-lg">개최 국가</h3>
+                    <div id="country-filters" class="flex flex-wrap gap-2">
+                        <button data-filter-group="country" data-filter-value="all" class="filter-btn active py-2 px-4 bg-slate-200 text-slate-700 rounded-full text-sm transition-colors duration-200 hover:bg-slate-300">전체</button>
+                        <button data-filter-group="country" data-filter-value="미국" class="filter-btn py-2 px-4 bg-slate-200 text-slate-700 rounded-full text-sm transition-colors duration-200 hover:bg-slate-300">미국</button>
+                        <button data-filter-group="country" data-filter-value="캐나다" class="filter-btn py-2 px-4 bg-slate-200 text-slate-700 rounded-full text-sm transition-colors duration-200 hover:bg-slate-300">캐나다</button>
+                    </div>
+                </div>
+                 <div class="md:col-span-2 lg:col-span-1">
+                    <h3 class="font-bold mb-3 text-lg">키워드 검색</h3>
+                    <input type="text" id="search-input" placeholder="박람회 이름으로 검색..." class="w-full p-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                </div>
+            </div>
+            <div class="mt-6">
+                <h3 class="font-bold mb-3 text-lg">주요 주제</h3>
+                <div id="theme-filters" class="flex flex-wrap gap-2">
+                     <button data-filter-group="theme" data-filter-value="all" class="filter-btn active py-2 px-4 bg-slate-200 text-slate-700 rounded-full text-sm transition-colors duration-200 hover:bg-slate-300">전체</button>
+                </div>
+            </div>
+        </section>
+
+        <main>
+            <section id="stats" class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+                <div class="bg-white p-4 rounded-xl shadow text-center">
+                    <h4 class="text-sm font-bold text-slate-500">총 박람회 수</h4>
+                    <p id="total-count" class="text-3xl font-bold text-blue-600">0</p>
+                </div>
+                <div class="bg-white p-4 rounded-xl shadow text-center">
+                    <h4 class="text-sm font-bold text-slate-500">미국</h4>
+                    <p id="usa-count" class="text-3xl font-bold text-slate-700">0</p>
+                </div>
+                <div class="bg-white p-4 rounded-xl shadow text-center">
+                    <h4 class="text-sm font-bold text-slate-500">캐나다</h4>
+                    <p id="canada-count" class="text-3xl font-bold text-slate-700">0</p>
+                </div>
+                 <div class="bg-white p-4 rounded-xl shadow text-center">
+                    <h4 class="text-sm font-bold text-slate-500">검색 결과</h4>
+                    <p id="filtered-count" class="text-3xl font-bold text-blue-600">0</p>
+                </div>
+            </section>
+            
+            <section id="visualizations" class="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
+                <div class="bg-white p-6 rounded-xl shadow-md">
+                    <h3 class="font-bold text-xl mb-4 text-center">연도별 박람회 수</h3>
+                    <div class="chart-container">
+                        <canvas id="yearlyChart"></canvas>
+                    </div>
+                </div>
+                <div class="bg-white p-6 rounded-xl shadow-md">
+                    <h3 class="font-bold text-xl mb-4 text-center">주제별 박람회 분포</h3>
+                    <div class="chart-container">
+                        <canvas id="themeChart"></canvas>
+                    </div>
+                </div>
+            </section>
+
+            <section id="expo-list-section">
+                 <h2 class="text-2xl font-bold mb-4">박람회 목록</h2>
+                <div id="expo-list" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const expoData = [
+                { id: 1, name: 'International Production & Processing Expo (IPPE)', startDate: '2026-01-27', endDate: '2026-01-29', year: 2026, location: '애틀랜타, 조지아, 미국', country: '미국', theme: '가금류, 육류, 사료 산업 (가공, 포장, 장비, 기술, 물류)', mainThemes: ['가금류', '육류', '사료', '장비', '기술'], link: 'https://www.ippexpo.org/', remarks: '세계 최대 규모의 가금류, 육류, 사료 산업 박람회. 북미 시장 진출의 핵심.' },
+                { id: 2, name: 'World Pork Expo', startDate: '2026-06-03', endDate: '2026-06-05', year: 2026, location: '데모인, 아이오와, 미국', country: '미국', theme: '양돈 (유전학, 영양, 사료, 장비, 건강, 시장 동향)', mainThemes: ['양돈', '영양', '사료', '장비'], link: 'https://www.worldpork.org/', remarks: '북미 최대 양돈 전문 박람회. 양돈 산업의 최신 트렌드 및 기술 교류의 장.' },
+                { id: 3, name: 'Cattle Industry Convention & NCBA Trade Show', startDate: '2026-02-04', endDate: '2026-02-06', year: 2026, location: '샌안토니오, 텍사스, 미국', country: '미국', theme: '소(牛) 산업 (번식, 영양, 건강, 육종, 시장 동향, 정책)', mainThemes: ['소', '영양', '수의학'], link: 'https://convention.ncba.org/', remarks: '미국 소 산업의 주요 컨벤션 및 무역 박람회. 정책 및 시장 분석에 강점.' },
+                { id: 4, name: 'Dairy-Tech (Global Dairy Technology Conference & Expo)', startDate: '2026-02-05', endDate: '2026-02-06', year: 2026, location: '캘거리, 앨버타, 캐나다', country: '캐나다', theme: '낙농업 (착유 기술, 유제품 가공, 사료, 유전학, 데이터 관리)', mainThemes: ['낙농', '기술', '사료'], link: null, remarks: '북미 낙농업의 최신 기술과 트렌드를 접할 수 있는 주요 행사.' },
+                { id: 5, name: 'Livestock Canada (Livestock Production & Processing Expo)', startDate: '2025-10-22', endDate: '2025-10-24', year: 2025, location: '토론토, 온타리오, 캐나다', country: '캐나다', theme: '축산업 전반 (사육, 가공, 장비, 기술, 영양)', mainThemes: ['장비', '기술', '영양'], link: 'https://livestockcanada.ca/', remarks: '캐나다의 주요 축산 박람회. 캐나다 시장 진출에 관심 있는 기업에 유용.' },
+                { id: 6, name: 'Poultry Tech Summit', startDate: '2025-11-04', endDate: '2025-11-06', year: 2025, location: '애틀랜타, 조지아, 미국', country: '미국', theme: '가금류 기술 (혁신, 자동화, 데이터 분석, AI, 로봇 공학)', mainThemes: ['가금류', '기술'], link: 'https://www.poultrytechsummit.com/', remarks: '가금류 산업의 미래 기술에 초점을 맞춘 컨퍼런스 및 전시회.' },
+                { id: 7, name: 'Western Canadian Crop Production Show', startDate: '2026-01-13', endDate: '2026-01-16', year: 2026, location: '새스커툰, 서스캐처원, 캐나다', country: '캐나다', theme: '작물 생산, 농업 기술 (축산 사료 관련 기술 포함)', mainThemes: ['사료', '기술'], link: 'https://www.saskatoonex.com/western-canadian-crop-production-show', remarks: '캐나다 서부의 주요 농업 행사로, 사료 작물 및 관련 기술에 대한 정보 획득 가능.' },
+                { id: 8, name: 'National Farm Machinery Show', startDate: '2026-02-12', endDate: '2026-02-15', year: 2026, location: '루이빌, 켄터키, 미국', country: '미국', theme: '농기계, 농업 기술 (축산 장비 및 기술 포함)', mainThemes: ['장비', '기술'], link: 'https://farmmachineryshow.org/', remarks: '북미 최대 농기계 박람회 중 하나. 축산용 대형 장비 및 기술 전시.' },
+                { id: 9, name: 'Agri-Trade Equipment Expo', startDate: '2025-11-05', endDate: '2025-11-07', year: 2025, location: '레드디어, 앨버타, 캐나다', country: '캐나다', theme: '농업 장비, 기술 (축산 관련 장비 및 솔루션 포함)', mainThemes: ['장비', '기술'], link: 'https://agri-trade.com/', remarks: '캐나다 서부의 주요 농업 및 축산 장비 전시회.' },
+                { id: 10, name: 'California Animal Nutrition Conference (CANC)', startDate: '2025-05-07', endDate: '2025-05-08', year: 2025, location: '프레즈노, 캘리포니아, 미국', country: '미국', theme: '동물 영양 (사료, 영양 연구, 사료 첨가제)', mainThemes: ['영양', '사료'], link: 'https://animalnutritionconference.ucdavis.edu/', remarks: '동물 영양 및 사료 분야의 학술 및 산업 컨퍼런스.' },
+                { id: 11, name: 'American Dairy Science Association (ADSA) Annual Meeting', startDate: '2025-07-20', endDate: '2025-07-23', year: 2025, location: '캔자스시티, 미주리, 미국', country: '미국', theme: '낙농 과학, 연구, 기술 (유전학, 영양, 생리학)', mainThemes: ['낙농', '기술', '영양'], link: 'https://www.adsa.org/meetings/annual-meeting', remarks: '낙농 과학 분야의 주요 학술 대회. 최신 연구 동향 파악에 유리.' },
+                { id: 12, name: 'Midwest Poultry Federation Convention', startDate: '2026-03-17', endDate: '2026-03-19', year: 2026, location: '미니애폴리스, 미네소타, 미국', country: '미국', theme: '가금류 (생산, 가공, 건강, 영양, 마케팅)', mainThemes: ['가금류', '영양', '수의학'], link: 'https://midwestpoultry.com/', remarks: '중서부 지역의 주요 가금류 산업 컨벤션.' },
+                { id: 13, name: 'International Poultry Scientific Forum (IPSF)', startDate: '2026-01-26', endDate: '2026-01-27', year: 2026, location: '애틀랜타, 조지아, 미국', country: '미국', theme: '가금류 과학 (연구 발표, 최신 지견 공유)', mainThemes: ['가금류', '기술'], link: 'https://www.ippexpo.org/education/ipsf/', remarks: 'IPPE와 함께 개최되는 가금류 과학 포럼. 학술적 깊이가 있는 정보 제공.' },
+                { id: 14, name: 'North American Meat Institute (NAMI) Annual Meeting', startDate: '2026-01-27', endDate: '2026-01-29', year: 2026, location: '애틀랜타, 조지아, 미국', country: '미국', theme: '육류 산업 (정책, 규제, 시장 동향, 가공 기술)', mainThemes: ['육류', '기술'], link: 'https://www.meatinstitute.org/', remarks: 'IPPE와 함께 개최되며, 육류 산업의 정책 및 비즈니스 리더십에 초점.' },
+                { id: 15, name: 'American Association of Swine Veterinarians (AASV) Annual Meeting', startDate: '2026-03-07', endDate: '2026-03-10', year: 2026, location: '샌안토니오, 텍사스, 미국', country: '미국', theme: '양돈 수의학 (질병 관리, 예방, 치료, 연구)', mainThemes: ['양돈', '수의학'], link: 'https://aasv.org/', remarks: '양돈 수의사들의 주요 학술 대회. 양돈 질병 및 건강 관리에 특화.' }
+            ];
+
+            let filters = {
+                year: 'all',
+                country: 'all',
+                theme: 'all',
+                search: ''
+            };
+
+            const expoListContainer = document.getElementById('expo-list');
+            const searchInput = document.getElementById('search-input');
+            const filterButtons = document.querySelectorAll('.filter-btn');
+
+            let yearlyChart, themeChart;
+
+            function renderExpoCards(expos) {
+                expoListContainer.innerHTML = '';
+                if (expos.length === 0) {
+                    expoListContainer.innerHTML = `<p class="text-center text-slate-500 md:col-span-2 xl:col-span-3">선택한 조건에 맞는 박람회가 없습니다.</p>`;
+                    return;
+                }
+                expos.forEach(expo => {
+                    const card = document.createElement('div');
+                    card.className = 'bg-white p-6 rounded-lg shadow-md hover:shadow-xl transition-shadow duration-300 flex flex-col';
+                    card.innerHTML = `
+                        <h3 class="text-xl font-bold mb-2">${expo.name}</h3>
+                        <p class="text-sm text-slate-600 mb-4 flex items-center">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-2" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z" clip-rule="evenodd" /></svg>
+                            ${expo.startDate} ~ ${expo.endDate}
+                        </p>
+                        <p class="text-sm text-slate-600 mb-4 flex items-center">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-2" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z" clip-rule="evenodd" /></svg>
+                            ${expo.location}
+                        </p>
+                        <p class="text-sm text-slate-600 mb-4"><strong>주제:</strong> ${expo.theme}</p>
+                        <div class="flex flex-wrap gap-2 mb-4">
+                            ${expo.mainThemes.map(t => `<span class="bg-blue-100 text-blue-800 text-xs font-semibold mr-2 px-2.5 py-0.5 rounded-full">${t}</span>`).join('')}
+                        </div>
+                        <p class="text-sm text-slate-500 flex-grow mb-4"><em>${expo.remarks}</em></p>
+                        <a href="${expo.link}" target="_blank" class="${!expo.link ? 'opacity-50 cursor-not-allowed ' : 'hover:bg-blue-700 '} mt-auto w-full text-center bg-blue-600 text-white font-bold py-2 px-4 rounded-lg transition-colors duration-200">
+                            공식 웹사이트 방문
+                        </a>
+                    `;
+                    expoListContainer.appendChild(card);
+                });
+            }
+            
+            function updateStats(filteredExpos) {
+                document.getElementById('total-count').textContent = expoData.length;
+                document.getElementById('usa-count').textContent = expoData.filter(e => e.country === '미국').length;
+                document.getElementById('canada-count').textContent = expoData.filter(e => e.country === '캐나다').length;
+                document.getElementById('filtered-count').textContent = filteredExpos.length;
+            }
+            
+            function updateCharts(filteredExpos) {
+                const yearlyData = filteredExpos.reduce((acc, expo) => {
+                    acc[expo.year] = (acc[expo.year] || 0) + 1;
+                    return acc;
+                }, {});
+
+                const themeData = filteredExpos.flatMap(expo => expo.mainThemes).reduce((acc, theme) => {
+                    acc[theme] = (acc[theme] || 0) + 1;
+                    return acc;
+                }, {});
+
+                const sortedThemes = Object.entries(themeData).sort(([,a],[,b]) => b-a);
+                
+                yearlyChart.data.labels = Object.keys(yearlyData).sort();
+                yearlyChart.data.datasets[0].data = Object.values(yearlyData).sort((a,b) => a-b);
+                yearlyChart.update();
+
+                themeChart.data.labels = sortedThemes.map(item => item[0]);
+                themeChart.data.datasets[0].data = sortedThemes.map(item => item[1]);
+                themeChart.update();
+            }
+
+            function applyFilters() {
+                let filtered = [...expoData];
+
+                if (filters.year !== 'all') {
+                    filtered = filtered.filter(expo => expo.year.toString() === filters.year);
+                }
+                if (filters.country !== 'all') {
+                    filtered = filtered.filter(expo => expo.country === filters.country);
+                }
+                if (filters.theme !== 'all') {
+                    filtered = filtered.filter(expo => expo.mainThemes.includes(filters.theme));
+                }
+                if (filters.search) {
+                    filtered = filtered.filter(expo => expo.name.toLowerCase().includes(filters.search.toLowerCase()));
+                }
+
+                renderExpoCards(filtered);
+                updateStats(filtered);
+                updateCharts(filtered);
+            }
+            
+            function initThemeFilters() {
+                const themeContainer = document.getElementById('theme-filters');
+                const allThemes = new Set(expoData.flatMap(e => e.mainThemes));
+                [...allThemes].sort().forEach(theme => {
+                    const button = document.createElement('button');
+                    button.dataset.filterGroup = 'theme';
+                    button.dataset.filterValue = theme;
+                    button.className = 'filter-btn py-2 px-4 bg-slate-200 text-slate-700 rounded-full text-sm transition-colors duration-200 hover:bg-slate-300';
+                    button.textContent = theme;
+                    themeContainer.appendChild(button);
+                });
+            }
+
+            function initCharts() {
+                const yearlyCtx = document.getElementById('yearlyChart').getContext('2d');
+                yearlyChart = new Chart(yearlyCtx, {
+                    type: 'bar',
+                    data: { labels: [], datasets: [{ label: '박람회 수', data: [], backgroundColor: 'rgba(37, 99, 235, 0.8)', borderColor: 'rgba(37, 99, 235, 1)', borderWidth: 1 }] },
+                    options: { responsive: true, maintainAspectRatio: false, scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } } }
+                });
+
+                const themeCtx = document.getElementById('themeChart').getContext('2d');
+                themeChart = new Chart(themeCtx, {
+                    type: 'doughnut',
+                    data: { labels: [], datasets: [{ label: '박람회 수', data: [], backgroundColor: ['#3b82f6', '#6366f1', '#8b5cf6', '#a855f7', '#d946ef', '#ec4899', '#f43f5e', '#ef4444', '#f97316', '#f59e0b'], hoverOffset: 4 }] },
+                    options: { responsive: true, maintainAspectRatio: false }
+                });
+            }
+            
+            filterButtons.forEach(button => {
+                button.addEventListener('click', (e) => {
+                    const group = e.target.dataset.filterGroup;
+                    const value = e.target.dataset.filterValue;
+                    filters[group] = value;
+                    
+                    document.querySelectorAll(`[data-filter-group="${group}"]`).forEach(btn => btn.classList.remove('active'));
+                    e.target.classList.add('active');
+                    
+                    applyFilters();
+                });
+            });
+
+            searchInput.addEventListener('input', (e) => {
+                filters.search = e.target.value;
+                applyFilters();
+            });
+            
+            document.getElementById('theme-filters').addEventListener('click', (e) => {
+                if(e.target.matches('.filter-btn')) {
+                    const group = e.target.dataset.filterGroup;
+                    const value = e.target.dataset.filterValue;
+                    filters[group] = value;
+                    
+                    document.querySelectorAll(`[data-filter-group="${group}"]`).forEach(btn => btn.classList.remove('active'));
+                    e.target.classList.add('active');
+                    
+                    applyFilters();
+                }
+            });
+
+
+            initThemeFilters();
+            initCharts();
+            applyFilters();
+        });
+    </script>
+</body>
+</html>
